@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProTrade Analytics | Premium</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div id="toast" class="toast">Action successful!</div>
+
+    <div id="auth-container" class="container active">
+        <div class="auth-wrapper">
+            <div class="auth-branding">
+                <div class="brand-content">
+                    <h1><i class="fa-solid fa-chart-line"></i> ProTrade</h1>
+                    <p>Elevate your trading psychology and analytics.</p>
+                </div>
+            </div>
+            <div class="auth-forms">
+                <form id="login-form" class="active-form">
+                    <h2>Welcome Back</h2>
+                    <p class="subtitle">Enter your credentials to access your dashboard.</p>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-user"></i>
+                        <input type="text" id="login-username" placeholder="Username" required>
+                    </div>
+                    <div class="input-wrapper">
+                        <i class="fa-solid fa-lock"></i>
+                        <input type="password" id="login-password" placeholder="Password" required>
+                    </div>
+                    <button type="submit" class="primary-btn">Log In</button>
+                    <p class="toggle-text">New here? <a href="#" onclick="toggleAuth('signup')">Create an account</a></p>
+                </form>
+
+                <form id="signup-form">
+                    <h2>Create Account</h2>
+                    <div class="form-grid">
+                        <input type="text" id="reg-fullname" placeholder="Full Name" required>
+                        <input type="email" id="reg-email" placeholder="Email Address" required>
+                        <input type="date" id="reg-dob" required>
+                        <input type="text" id="reg-username" placeholder="Choose Username" required>
+                        <input type="password" id="reg-password" placeholder="Password" required>
+                        <input type="password" id="reg-confirm" placeholder="Confirm Password" required>
+                    </div>
+                    <button type="submit" class="primary-btn">Sign Up</button>
+                    <p class="toggle-text">Already a member? <a href="#" onclick="toggleAuth('login')">Log In</a></p>
+                </form>
+                <p id="auth-error" class="error-msg"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-container" class="container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo"><i class="fa-solid fa-chart-pie"></i> ProTrade</div>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" class="nav-item active" data-target="view-dashboard"><i class="fa-solid fa-house"></i> Dashboard</a>
+                <a href="#" class="nav-item" data-target="view-trades"><i class="fa-solid fa-list-check"></i> Trade History</a>
+                <a href="#" class="nav-item" data-target="view-notebook"><i class="fa-solid fa-clipboard"></i> Notebook</a>
+                <a href="#" class="nav-item" data-target="view-newtrade"><i class="fa-solid fa-plus-circle"></i> New Trade</a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="user-profile" id="user-profile-btn" title="View Profile">
+                    <img src="" id="sidebar-avatar-img" class="custom-avatar-img" style="display:none;">
+                    <div class="avatar" id="avatar-initial">U</div>
+                    <div class="user-info">
+                        <span id="display-name" class="name">User</span>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <div class="content-wrapper">
+                <section id="view-dashboard" class="content-section active">
+                    <div class="section-title">
+                        <h1>Overview Analysis</h1>
+                        <p class="text-muted">Automated analysis based on your trade outcomes.</p>
+                    </div>
+                    
+                    <div class="widgets-grid">
+                        <div class="widget card">
+                            <div class="widget-icon primary-bg"><i class="fa-solid fa-bullseye"></i></div>
+                            <div class="widget-data">
+                                <span class="widget-title">Target Win Rate</span>
+                                <div class="widget-value" id="dash-winrate">0.0%</div>
+                            </div>
+                        </div>
+                        <div class="widget card">
+                            <div class="widget-icon success-bg"><i class="fa-solid fa-check-double"></i></div>
+                            <div class="widget-data">
+                                <span class="widget-title">Targets Hit</span>
+                                <div class="widget-value success" id="dash-targets">0</div>
+                            </div>
+                        </div>
+                        <div class="widget card">
+                            <div class="widget-icon danger-bg"><i class="fa-solid fa-xmark"></i></div>
+                            <div class="widget-data">
+                                <span class="widget-title">Stoplosses Hit</span>
+                                <div class="widget-value danger" id="dash-stoplosses">0</div>
+                            </div>
+                        </div>
+                        <div class="widget card">
+                            <div class="widget-icon warning-bg"><i class="fa-solid fa-minus"></i></div>
+                            <div class="widget-data">
+                                <span class="widget-title">Breakevens</span>
+                                <div class="widget-value warning" id="dash-breakevens">0</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="charts-grid">
+                        <div class="card chart-card">
+                            <h3>Outcome Distribution</h3>
+                            <div class="chart-container">
+                                <canvas id="outcomeChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="view-trades" class="content-section">
+                    <div class="section-title">
+                        <h1>Trade History</h1>
+                        <button id="export-csv-btn" class="filter-btn">
+                            <i class="fa-solid fa-file-csv"></i> Export to CSV
+                        </button>
+                    </div>
+                    <div class="card table-card">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Asset</th>
+                                    <th>Entry</th>
+                                    <th>Exit</th>
+                                    <th>Outcome</th>
+                                    <th>Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody id="trade-body"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section id="view-notebook" class="content-section">
+                    <div class="section-title">
+                        <h1>Trading Notebook</h1>
+                        <span class="save-status"><i class="fa-solid fa-cloud-arrow-up"></i> Auto-saved</span>
+                    </div>
+                    <div class="card notebook-card">
+                        <textarea id="notebook-textarea" placeholder="Document your daily edge, psychological state, and market observations here..."></textarea>
+                    </div>
+                </section>
+
+                <section id="view-newtrade" class="content-section">
+                    <div class="section-title">
+                        <h1>New Trade Journal Entry</h1>
+                    </div>
+                    <div class="card form-card">
+                        <form id="new-trade-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Market Type</label>
+                                    <select id="trade-market" required>
+                                        <option value="Stock">Stock</option>
+                                        <option value="Indices">Indices</option>
+                                        <option value="Forex">Forex</option>
+                                        <option value="Crypto">Crypto</option>
+                                    </select>
+                                </div>
+                                <div class="form-group" style="position: relative;">
+                                    <label>Ticker / Pair</label>
+                                    <div class="search-input-container">
+                                        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+                                        <input type="text" id="trade-symbol" placeholder="Search e.g. AAPL, BTC, NIFTY..." autocomplete="off" required>
+                                    </div>
+                                    <div id="search-results" class="search-dropdown"></div>
+                                </div>
+                            </div>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Entry Date (MM/DD/YY)</label>
+                                    <input type="date" id="trade-date" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Trade Outcome</label>
+                                    <select id="trade-outcome" required>
+                                        <option value="Target">Target Hit (Win)</option>
+                                        <option value="Stoploss">Stoploss Hit (Loss)</option>
+                                        <option value="Breakeven">Breakeven (Tie)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Entry Price</label>
+                                    <input type="number" id="trade-entry" step="any" placeholder="0.00" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Exit Price</label>
+                                    <input type="number" id="trade-exit" step="any" placeholder="0.00" required>
+                                </div>
+                            </div>
+                            
+                            <div class="form-group full-width">
+                                <label>Journal Notes</label>
+                                <textarea id="trade-notes" rows="3" placeholder="Why did you enter? Did you follow your plan?"></textarea>
+                            </div>
+                            <button type="submit" class="primary-btn submit-trade-btn">Save to Journal & Analyze</button>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <div id="profile-modal" class="modal-overlay">
+        <div class="modal-content card">
+            <div class="modal-header">
+                <h2>Your Profile</h2>
+                <button id="close-profile-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="profile-details">
+                <div class="avatar-wrapper">
+                    <img src="" id="modal-avatar-img" class="custom-avatar-img large-avatar" style="display:none;">
+                    <div class="profile-avatar" id="modal-avatar">U</div>
+                    <label for="avatar-upload" class="edit-avatar-btn" title="Change Photo">
+                        <i class="fa-solid fa-camera"></i>
+                    </label>
+                    <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
+                </div>
+                
+                <h3 id="modal-name">User Name</h3>
+                <p id="modal-email" class="text-muted">user@email.com</p>
+                <hr>
+                <div class="profile-info-grid">
+                    <div class="info-group">
+                        <label>Username</label>
+                        <p id="modal-username">username</p>
+                    </div>
+                    <div class="info-group">
+                        <label>Date of Birth</label>
+                        <p id="modal-dob">01/01/2000</p>
+                    </div>
+                </div>
+                <hr>
+                <button id="modal-logout-btn" class="danger-btn">
+                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
