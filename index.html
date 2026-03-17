@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tradenix | Premium</title>
+    <title>Tradenix | Premium Trading Journal</title>
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -13,7 +13,46 @@
 
     <div id="toast" class="toast">Action successful!</div>
 
-    <div id="auth-container" class="container active">
+    <div id="landing-container" class="container active">
+        <div class="landing-wrapper">
+            <div class="landing-hero">
+                <div class="logo-large"><i class="fa-solid fa-chart-line"></i> Tradenix</div>
+                <h1>Master Your Trading Edge</h1>
+                <p class="landing-desc">A professional trading journal designed to help you track your setups, analyze your win rates, and elevate your trading psychology.</p>
+                
+                <div class="landing-features">
+                    <div class="feature-box">
+                        <i class="fa-solid fa-book"></i>
+                        <h3>Detailed Logging</h3>
+                        <p>Record your entries, exits, and state of mind for every trade.</p>
+                    </div>
+                    <div class="feature-box">
+                        <i class="fa-solid fa-brain"></i>
+                        <h3>Psychology Tracking</h3>
+                        <p>A built-in notebook to document your edge and market observations.</p>
+                    </div>
+                    <div class="feature-box">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <h3>Performance Analytics</h3>
+                        <p>Automatically visualize your win rate, targets, and stop losses.</p>
+                    </div>
+                    <div class="feature-box">
+                        <i class="fa-solid fa-globe"></i>
+                        <h3>Multi-Asset Tracking</h3>
+                        <p>Log and filter trades seamlessly across Stocks, Forex, Indices, and Crypto.</p>
+                    </div>
+                </div>
+
+                <div class="landing-actions">
+                    <button class="primary-btn large-btn" onclick="showAuth('signup')">Create Account</button>
+                    <button id="landing-skip-btn" class="filter-btn large-btn">Skip to Dashboard</button>
+                    <p style="margin-top: 1.5rem; color: var(--text-muted); font-size: 0.9rem;">Already have an account? <a href="#" onclick="showAuth('login')" style="color: var(--primary);">Log In</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="auth-container" class="container">
         <div class="auth-wrapper">
             <div class="auth-branding">
                 <div class="brand-content">
@@ -80,9 +119,18 @@
         <main class="main-content">
             <div class="content-wrapper">
                 <section id="view-dashboard" class="content-section active">
-                    <div class="section-title">
-                        <h1>Overview Analysis</h1>
-                        <p class="text-muted">Automated analysis based on your trade outcomes.</p>
+                    <div class="section-title" style="align-items: flex-end;">
+                        <div>
+                            <h1>Overview Analysis</h1>
+                            <p class="text-muted">Automated analysis based on your trade outcomes.</p>
+                        </div>
+                        <div class="market-filters">
+                            <button class="market-filter-btn active" data-market="All">All Markets</button>
+                            <button class="market-filter-btn" data-market="Stock">Stocks</button>
+                            <button class="market-filter-btn" data-market="Indices">Indices</button>
+                            <button class="market-filter-btn" data-market="Forex">Forex</button>
+                            <button class="market-filter-btn" data-market="Crypto">Crypto</button>
+                        </div>
                     </div>
                     
                     <div class="widgets-grid">
@@ -220,45 +268,72 @@
                         </form>
                     </div>
                 </section>
+
+                <section id="view-profile" class="content-section">
+                    <div class="section-title">
+                        <h1>Your Profile</h1>
+                        <p class="text-muted">Manage your personal information and settings.</p>
+                    </div>
+                    <div class="profile-page-grid">
+                        <div class="card profile-card-left">
+                            <div class="avatar-wrapper large-avatar-wrapper">
+                                <img src="" id="page-avatar-img" class="custom-avatar-img page-avatar" style="display:none;">
+                                <div class="profile-avatar page-avatar-initial" id="page-avatar">U</div>
+                                <label for="page-avatar-upload" class="edit-avatar-btn" title="Change Photo">
+                                    <i class="fa-solid fa-camera"></i>
+                                </label>
+                                <input type="file" id="page-avatar-upload" accept="image/*" style="display: none;">
+                            </div>
+                            <h3 id="page-display-name" style="color: var(--text-dark); font-size: 1.4rem;">User Name</h3>
+                            <p id="page-display-username" class="text-muted">@username</p>
+                            
+                            <button id="page-logout-btn" class="danger-btn" style="margin-top: 2rem;">
+                                <i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out
+                            </button>
+                            <button id="page-guest-logout-btn" class="danger-btn" style="margin-top: 2rem; display: none;">
+                                <i class="fa-solid fa-arrow-right-from-bracket"></i> Exit Guest Mode
+                            </button>
+                        </div>
+
+                        <div class="card profile-card-right">
+                            <h3 style="margin-bottom: 1.5rem; color: var(--text-dark); font-size: 1.3rem;">Personal Details</h3>
+                            <form id="edit-profile-form">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Full Name</label>
+                                        <input type="text" id="edit-fullname" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Username</label>
+                                        <input type="text" id="edit-username" disabled title="Username cannot be changed">
+                                    </div>
+                                </div>
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Email Address</label>
+                                        <input type="email" id="edit-email" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Date of Birth</label>
+                                        <input type="date" id="edit-dob" required>
+                                    </div>
+                                </div>
+                                <button type="submit" class="primary-btn" id="save-profile-btn" style="width: auto; padding: 1rem 2rem;">Save Changes</button>
+                                
+                                <div id="guest-profile-warning" style="display:none; margin-top: 1.5rem; padding: 1rem; background: var(--warning-bg); border-radius: 8px; border: 1px solid var(--warning);">
+                                    <p style="color: var(--warning); margin-bottom: 0.5rem;"><strong>Guest Account</strong></p>
+                                    <p style="color: var(--text-dark); font-size: 0.9rem;">Your data is saved temporarily. To make permanent profile changes, please create a free account.</p>
+                                    <div style="margin-top: 1rem; display: flex; gap: 1rem;">
+                                        <button type="button" class="primary-btn" onclick="document.getElementById('page-guest-logout-btn').click();" style="padding: 0.5rem 1rem; font-size: 0.9rem;">Create Account</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </section>
+
             </div>
         </main>
-    </div>
-
-    <div id="profile-modal" class="modal-overlay">
-        <div class="modal-content card">
-            <div class="modal-header">
-                <h2>Your Profile</h2>
-                <button id="close-profile-btn" class="icon-btn"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="profile-details">
-                <div class="avatar-wrapper">
-                    <img src="" id="modal-avatar-img" class="custom-avatar-img large-avatar" style="display:none;">
-                    <div class="profile-avatar" id="modal-avatar">U</div>
-                    <label for="avatar-upload" class="edit-avatar-btn" title="Change Photo">
-                        <i class="fa-solid fa-camera"></i>
-                    </label>
-                    <input type="file" id="avatar-upload" accept="image/*" style="display: none;">
-                </div>
-                
-                <h3 id="modal-name">User Name</h3>
-                <p id="modal-email" class="text-muted">user@email.com</p>
-                <hr>
-                <div class="profile-info-grid">
-                    <div class="info-group">
-                        <label>Username</label>
-                        <p id="modal-username">username</p>
-                    </div>
-                    <div class="info-group">
-                        <label>Date of Birth</label>
-                        <p id="modal-dob">01/01/2000</p>
-                    </div>
-                </div>
-                <hr>
-                <button id="modal-logout-btn" class="danger-btn">
-                    <i class="fa-solid fa-arrow-right-from-bracket"></i> Log Out
-                </button>
-            </div>
-        </div>
     </div>
 
     <script src="script.js"></script>

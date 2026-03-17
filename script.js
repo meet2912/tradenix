@@ -1,6 +1,8 @@
 // --- DOM ELEMENTS ---
+const landingContainer = document.getElementById('landing-container');
 const authContainer = document.getElementById('auth-container');
 const dashboardContainer = document.getElementById('dashboard-container');
+
 const loginForm = document.getElementById('login-form');
 const signupForm = document.getElementById('signup-form');
 const errorMsg = document.getElementById('auth-error');
@@ -15,15 +17,16 @@ const tradeBody = document.getElementById('trade-body');
 const notebookArea = document.getElementById('notebook-textarea');
 const exportCsvBtn = document.getElementById('export-csv-btn');
 
-// Profile Modal Elements
+// Profile Page Elements
 const userProfileBtn = document.getElementById('user-profile-btn');
-const profileModal = document.getElementById('profile-modal');
-const closeProfileBtn = document.getElementById('close-profile-btn');
-const modalLogoutBtn = document.getElementById('modal-logout-btn');
-const avatarUpload = document.getElementById('avatar-upload');
+const pageLogoutBtn = document.getElementById('page-logout-btn');
+const pageGuestLogoutBtn = document.getElementById('page-guest-logout-btn');
+const pageAvatarUpload = document.getElementById('page-avatar-upload');
+const editProfileForm = document.getElementById('edit-profile-form');
 
 let currentUser = null;
 let outcomeChartInstance = null;
+let currentMarketFilter = 'All';
 
 // --- TOAST NOTIFICATION ---
 function showToast(message) {
@@ -36,23 +39,27 @@ function showToast(message) {
 function updateAvatarDisplay(base64String) {
     const sidebarImg = document.getElementById('sidebar-avatar-img');
     const sidebarInit = document.getElementById('avatar-initial');
-    const modalImg = document.getElementById('modal-avatar-img');
-    const modalInit = document.getElementById('modal-avatar');
+    const pageImg = document.getElementById('page-avatar-img');
+    const pageInit = document.getElementById('page-avatar');
 
     if (base64String) {
         sidebarImg.src = base64String;
         sidebarImg.style.display = 'block';
         sidebarInit.style.display = 'none';
 
-        modalImg.src = base64String;
-        modalImg.style.display = 'block';
-        modalInit.style.display = 'none';
+        if(pageImg) {
+            pageImg.src = base64String;
+            pageImg.style.display = 'block';
+            pageInit.style.display = 'none';
+        }
     } else {
         sidebarImg.style.display = 'none';
         sidebarInit.style.display = 'flex';
 
-        modalImg.style.display = 'none';
-        modalInit.style.display = 'flex';
+        if(pageImg) {
+            pageImg.style.display = 'none';
+            pageInit.style.display = 'flex';
+        }
     }
 }
 
@@ -63,10 +70,21 @@ window.onload = () => {
         currentUser = activeUser;
         const userDetails = JSON.parse(localStorage.getItem(`details_${activeUser}`));
         loadDashboard(userDetails ? userDetails.fullname : activeUser);
+    } else {
+        landingContainer.classList.add('active');
+        authContainer.classList.remove('active');
+        dashboardContainer.classList.remove('active');
     }
 };
 
-// --- AUTHENTICATION LOGIC ---
+// --- AUTH / LANDING LOGIC ---
+function showAuth(type) {
+    landingContainer.classList.remove('active');
+    dashboardContainer.classList.remove('active');
+    authContainer.classList.add('active');
+    toggleAuth(type);
+}
+
 function toggleAuth(type) {
     errorMsg.innerText = "";
     if (type === 'signup') {
@@ -93,7 +111,7 @@ signupForm.addEventListener('submit', (e) => {
     localStorage.setItem(`user_${username}`, password);
     localStorage.setItem(`details_${username}`, JSON.stringify({ fullname, email, dob }));
     
-    showToast('Account created successfully!');
+    showToast('Thank you for creating an account on Tradenix!');
     loginUser(username, fullname);
 });
 
@@ -102,20 +120,12 @@ loginForm.addEventListener('submit', (e) => {
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     
-    const savedPassword = localStorage.getItem(`user_${username}`);
-    
-    if (!savedPassword) {
-        errorMsg.innerText = "Account not found. Please click 'Create an account' first.";
-        return;
-    }
-
-    if (savedPassword === password) {
+    if (localStorage.getItem(`user_${username}`) === password) {
         const userDetails = JSON.parse(localStorage.getItem(`details_${username}`));
-        errorMsg.innerText = ""; 
         showToast('Logged in successfully!');
         loginUser(username, userDetails ? userDetails.fullname : username);
     } else {
-        errorMsg.innerText = "Incorrect password. Please try again.";
+        errorMsg.innerText = "Invalid credentials.";
     }
 });
 
@@ -125,9 +135,40 @@ function loginUser(username, fullname) {
     loadDashboard(fullname);
 }
 
+// --- SKIP TO DASHBOARD LOGIC ---
+const landingSkipBtn = document.getElementById('landing-skip-btn');
+if (landingSkipBtn) {
+    landingSkipBtn.addEventListener('click', (e) => {
+        e.preventDefault(); 
+        const guestUsername = "guest_user";
+        const guestName = "Guest Trader";
+        
+        currentUser = guestUsername;
+        localStorage.setItem('activeUser', guestUsername);
+        
+        if (!localStorage.getItem(`details_${guestUsername}`)) {
+            localStorage.setItem(`details_${guestUsername}`, JSON.stringify({ fullname: guestName, email: "guest@tradenix.com", dob: "" }));
+        }
+        
+        errorMsg.innerText = ""; 
+        showToast('Entering as Guest...');
+        loadDashboard(guestName);
+    });
+}
+
 function loadDashboard(name) {
+    if(landingContainer) landingContainer.classList.remove('active');
     authContainer.classList.remove('active');
     dashboardContainer.classList.add('active');
+    
+    navItems.forEach(nav => nav.classList.remove('active'));
+    contentSections.forEach(sec => sec.classList.remove('active'));
+    
+    const dashNav = document.querySelector('[data-target="view-dashboard"]');
+    if(dashNav) dashNav.classList.add('active');
+    
+    const dashSection = document.getElementById('view-dashboard');
+    if(dashSection) dashSection.classList.add('active');
     
     displayName.innerText = name;
     avatarInitial.innerText = name.charAt(0).toUpperCase();
@@ -139,32 +180,96 @@ function loadDashboard(name) {
     loadNotebook();
 }
 
-// --- PROFILE MODAL LOGIC ---
+// --- PROFILE PAGE NAV LOGIC ---
 if (userProfileBtn) {
-    userProfileBtn.addEventListener('click', () => {
-        const userDetails = JSON.parse(localStorage.getItem(`details_${currentUser}`));
-        
-        document.getElementById('modal-avatar').innerText = (userDetails?.fullname || currentUser).charAt(0).toUpperCase();
-        document.getElementById('modal-name').innerText = userDetails?.fullname || currentUser;
-        document.getElementById('modal-email').innerText = userDetails?.email || 'N/A';
-        document.getElementById('modal-username').innerText = currentUser;
-        
-        if (userDetails?.dob) {
-            const parts = userDetails.dob.split('-');
-            document.getElementById('modal-dob').innerText = `${parts[1]}/${parts[2]}/${parts[0]}`;
-        } else {
-            document.getElementById('modal-dob').innerText = 'N/A';
-        }
-
-        const savedAvatar = localStorage.getItem(`avatar_${currentUser}`);
-        updateAvatarDisplay(savedAvatar);
-        
-        profileModal.classList.add('active');
+    userProfileBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        navItems.forEach(nav => nav.classList.remove('active'));
+        contentSections.forEach(sec => sec.classList.remove('active'));
+        document.getElementById('view-profile').classList.add('active');
+        loadProfilePage();
     });
 }
 
-if (avatarUpload) {
-    avatarUpload.addEventListener('change', function(e) {
+function loadProfilePage() {
+    const guestWarning = document.getElementById('guest-profile-warning');
+    const saveBtn = document.getElementById('save-profile-btn');
+    const guestLogout = document.getElementById('page-guest-logout-btn');
+    const normalLogout = document.getElementById('page-logout-btn');
+
+    const userDetails = JSON.parse(localStorage.getItem(`details_${currentUser}`));
+
+    document.getElementById('edit-username').value = currentUser;
+
+    if (currentUser === "guest_user") {
+        guestWarning.style.display = "block";
+        saveBtn.disabled = true;
+        saveBtn.style.opacity = "0.5";
+        saveBtn.style.cursor = "not-allowed";
+        
+        guestLogout.style.display = "block";
+        normalLogout.style.display = "none";
+        
+        document.getElementById('edit-fullname').value = "Guest Trader";
+        document.getElementById('edit-email').value = "guest@tradenix.com";
+        document.getElementById('edit-dob').value = "";
+        
+        document.getElementById('page-display-name').innerText = "Guest Trader";
+        document.getElementById('page-display-username').innerText = "Temporary Account";
+        document.getElementById('page-avatar').innerText = "G";
+    } else {
+        if(guestWarning) guestWarning.style.display = "none";
+        saveBtn.disabled = false;
+        saveBtn.style.opacity = "1";
+        saveBtn.style.cursor = "pointer";
+        
+        guestLogout.style.display = "none";
+        normalLogout.style.display = "block";
+        
+        document.getElementById('edit-fullname').value = userDetails?.fullname || currentUser;
+        document.getElementById('edit-email').value = userDetails?.email || '';
+        document.getElementById('edit-dob').value = userDetails?.dob || '';
+        
+        document.getElementById('page-display-name').innerText = userDetails?.fullname || currentUser;
+        document.getElementById('page-display-username').innerText = "@" + currentUser;
+        document.getElementById('page-avatar').innerText = (userDetails?.fullname || currentUser).charAt(0).toUpperCase();
+    }
+    
+    const savedAvatar = localStorage.getItem(`avatar_${currentUser}`);
+    updateAvatarDisplay(savedAvatar);
+}
+
+// --- PROFILE SAVING LOGIC ---
+if (editProfileForm) {
+    editProfileForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        if (currentUser === "guest_user") return; 
+        
+        const fullname = document.getElementById('edit-fullname').value.trim();
+        const email = document.getElementById('edit-email').value.trim();
+        const dob = document.getElementById('edit-dob').value;
+        
+        const userDetails = { fullname, email, dob };
+        localStorage.setItem(`details_${currentUser}`, JSON.stringify(userDetails));
+        
+        displayName.innerText = fullname; 
+        avatarInitial.innerText = fullname.charAt(0).toUpperCase(); 
+        
+        document.getElementById('page-display-name').innerText = fullname; 
+        document.getElementById('page-avatar').innerText = fullname.charAt(0).toUpperCase(); 
+        
+        showToast("Profile updated successfully!");
+    });
+}
+
+// --- AVATAR UPLOAD LOGIC ---
+if (pageAvatarUpload) {
+    pageAvatarUpload.addEventListener('change', function(e) {
+        if(currentUser === "guest_user") {
+            showToast("Guests cannot change avatars.");
+            return;
+        }
+        
         const file = e.target.files[0];
         if (file) {
             const reader = new FileReader();
@@ -179,17 +284,35 @@ if (avatarUpload) {
     });
 }
 
-if (closeProfileBtn) closeProfileBtn.addEventListener('click', () => profileModal.classList.remove('active'));
-if (profileModal) profileModal.addEventListener('click', (e) => { if(e.target === profileModal) profileModal.classList.remove('active'); });
+// --- MASTER LOGOUT LOGIC ---
+function performLogout(message) {
+    localStorage.removeItem('activeUser');
+    currentUser = null;
+    
+    // Explicitly hide auth and dashboard containers
+    dashboardContainer.classList.remove('active');
+    authContainer.classList.remove('active');
+    
+    // Explicitly show the landing container
+    landingContainer.classList.add('active');
+    
+    // Reset dashboard tabs so next login is clean
+    document.getElementById('view-profile').classList.remove('active');
+    contentSections.forEach(sec => sec.classList.remove('active'));
+    document.getElementById('view-dashboard').classList.add('active');
+    
+    showToast(message);
+}
 
-if (modalLogoutBtn) {
-    modalLogoutBtn.addEventListener('click', () => {
-        profileModal.classList.remove('active');
-        localStorage.removeItem('activeUser');
-        currentUser = null;
-        dashboardContainer.classList.remove('active');
-        authContainer.classList.add('active');
-        toggleAuth('login');
+if (pageLogoutBtn) {
+    pageLogoutBtn.addEventListener('click', () => {
+        performLogout('Logged out successfully');
+    });
+}
+
+if (pageGuestLogoutBtn) {
+    pageGuestLogoutBtn.addEventListener('click', () => {
+        performLogout('Exited Guest Mode');
     });
 }
 
@@ -204,6 +327,19 @@ navItems.forEach(item => {
         document.getElementById(item.getAttribute('data-target')).classList.add('active');
     });
 });
+
+// --- MARKET FILTER LOGIC ---
+const marketFilterBtns = document.querySelectorAll('.market-filter-btn');
+if (marketFilterBtns) {
+    marketFilterBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            marketFilterBtns.forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
+            currentMarketFilter = e.target.getAttribute('data-market');
+            loadTrades(); 
+        });
+    });
+}
 
 // --- DATE FORMATTER (MM/DD/YY) ---
 function formatDate(dateString) {
@@ -272,7 +408,7 @@ function renderChart(targets, stoplosses, breakevens) {
             maintainAspectRatio: false,
             cutout: '75%',
             plugins: {
-                legend: { position: 'bottom', labels: { color: '#6b7280', font: { family: 'Inter', size: 13 } } }
+                legend: { position: 'bottom', labels: { color: '#a1a1aa', font: { family: 'Inter', size: 13 } } }
             }
         }
     });
@@ -281,7 +417,12 @@ function renderChart(targets, stoplosses, breakevens) {
 // --- LOAD TRADES & CALCULATE STATS ---
 function loadTrades() {
     tradeBody.innerHTML = "";
-    let trades = JSON.parse(localStorage.getItem(`trades_${currentUser}`)) || [];
+    let allTrades = JSON.parse(localStorage.getItem(`trades_${currentUser}`)) || [];
+    
+    let trades = allTrades;
+    if (currentMarketFilter !== 'All') {
+        trades = allTrades.filter(t => t.market === currentMarketFilter);
+    }
     
     let targets = 0;
     let stoplosses = 0;
@@ -337,8 +478,12 @@ if (exportCsvBtn) {
     exportCsvBtn.addEventListener('click', () => {
         let trades = JSON.parse(localStorage.getItem(`trades_${currentUser}`)) || [];
         
+        if (currentMarketFilter !== 'All') {
+            trades = trades.filter(t => t.market === currentMarketFilter);
+        }
+        
         if (trades.length === 0) {
-            showToast("No trades to export yet!");
+            showToast("No trades to export for this filter!");
             return;
         }
 
@@ -356,87 +501,38 @@ if (exportCsvBtn) {
         const link = document.createElement("a");
         link.setAttribute("href", url);
         const today = new Date().toISOString().split('T')[0];
-        link.setAttribute("download", `Tradenix_Journal_${today}.csv`);
+        link.setAttribute("download", `Tradenix_Journal_${currentMarketFilter}_${today}.csv`);
         
         document.body.appendChild(link);
         link.click();
         
         document.body.removeChild(link);
-        showToast("Journal exported to CSV!");
+        showToast(`Exported ${currentMarketFilter} Journal to CSV!`);
     });
 }
 
-// --- LOCAL ASSETS FALLBACK ---
-const localAssets = [
-    { symbol: "RELIANCE", name: "Reliance Industries", type: "Stock", exchange: "NSE" },
-    { symbol: "TCS", name: "Tata Consultancy Services", type: "Stock", exchange: "NSE" },
-    { symbol: "HDFCBANK", name: "HDFC Bank", type: "Stock", exchange: "NSE" },
-    { symbol: "ICICIBANK", name: "ICICI Bank", type: "Stock", exchange: "NSE" },
-    { symbol: "INFY", name: "Infosys", type: "Stock", exchange: "NSE" },
-    { symbol: "SBIN", name: "State Bank of India", type: "Stock", exchange: "NSE" },
-    { symbol: "BHARTIARTL", name: "Bharti Airtel", type: "Stock", exchange: "NSE" },
-    { symbol: "ITC", name: "ITC Limited", type: "Stock", exchange: "NSE" },
-    { symbol: "LT", name: "Larsen & Toubro", type: "Stock", exchange: "NSE" },
-    { symbol: "BAJFINANCE", name: "Bajaj Finance", type: "Stock", exchange: "NSE" },
-    { symbol: "TATAMOTORS", name: "Tata Motors", type: "Stock", exchange: "NSE" },
-    { symbol: "NTPC", name: "NTPC Limited", type: "Stock", exchange: "NSE" },
-    { symbol: "KOTAKBANK", name: "Kotak Mahindra Bank", type: "Stock", exchange: "NSE" },
-    { symbol: "AXISBANK", name: "Axis Bank", type: "Stock", exchange: "NSE" },
-    { symbol: "M&M", name: "Mahindra & Mahindra", type: "Stock", exchange: "NSE" },
-    { symbol: "MARUTI", name: "Maruti Suzuki", type: "Stock", exchange: "NSE" },
-    { symbol: "ULTRACEMCO", name: "UltraTech Cement", type: "Stock", exchange: "NSE" },
-    { symbol: "ASIANPAINT", name: "Asian Paints", type: "Stock", exchange: "NSE" },
-    { symbol: "SUNPHARMA", name: "Sun Pharmaceutical", type: "Stock", exchange: "NSE" },
-    { symbol: "TITAN", name: "Titan Company", type: "Stock", exchange: "NSE" },
-    { symbol: "EUR/USD", name: "Euro / US Dollar", type: "Forex" },
-    { symbol: "GBP/USD", name: "British Pound / US Dollar", type: "Forex" },
-    { symbol: "USD/JPY", name: "US Dollar / Japanese Yen", type: "Forex" },
-    { symbol: "BTC/USD", name: "Bitcoin", type: "Crypto" },
-    { symbol: "ETH/USD", name: "Ethereum", type: "Crypto" },
-    { symbol: "NIFTY", name: "Nifty 50", type: "Indices", exchange: "NSE" },
-    { symbol: "BANKNIFTY", name: "Nifty Bank", type: "Indices", exchange: "NSE" }
-];
-
-// --- FETCH LIVE CURRENT MARKET PRICE ---
-async function fetchLivePrice(symbol) {
-    const entryInput = document.getElementById('trade-entry');
-    entryInput.placeholder = "Fetching live price...";
-    
-    try {
-        const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`;
-        // Updated to the secure /get proxy
-        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
-        
-        const response = await fetch(proxyUrl);
-        if (!response.ok) throw new Error('Network error');
-        
-        const proxyData = await response.json();
-        if (!proxyData.contents) throw new Error('Proxy blocked');
-
-        const data = JSON.parse(proxyData.contents);
-        
-        if (data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
-            const price = data.quoteResponse.result[0].regularMarketPrice;
-            if (price) {
-                const decimalPlaces = price < 10 ? 4 : 2; 
-                entryInput.value = price.toFixed(decimalPlaces);
-                showToast(`Live price fetched for ${symbol}`);
-            } else {
-                entryInput.placeholder = "0.00";
-            }
-        }
-    } catch (error) {
-        console.error("Live Price Proxy Error:", error);
-        entryInput.placeholder = "0.00";
-        showToast("Could not fetch live price.");
-    }
-}
-
-// --- LIVE YAHOO FINANCE SEARCH (Proxied safely) ---
+// --- HYBRID SEARCH (Instant Local + Live Alpha Vantage API) ---
 const symbolInput = document.getElementById('trade-symbol');
 const searchDropdown = document.getElementById('search-results');
 const marketSelect = document.getElementById('trade-market');
 
+const localAssets = [
+    { symbol: "EUR/USD", name: "Euro / US Dollar", type: "Forex" },
+    { symbol: "GBP/USD", name: "British Pound / US Dollar", type: "Forex" },
+    { symbol: "USD/JPY", name: "US Dollar / Japanese Yen", type: "Forex" },
+    { symbol: "USD/CHF", name: "US Dollar / Swiss Franc", type: "Forex" },
+    { symbol: "AUD/USD", name: "Australian Dollar / US Dollar", type: "Forex" },
+    { symbol: "USD/CAD", name: "US Dollar / Canadian Dollar", type: "Forex" },
+    { symbol: "NZD/USD", name: "New Zealand Dollar / US Dollar", type: "Forex" },
+    { symbol: "BTC/USD", name: "Bitcoin", type: "Crypto" },
+    { symbol: "ETH/USD", name: "Ethereum", type: "Crypto" },
+    { symbol: "NIFTY", name: "Nifty 50", type: "Indices" },
+    { symbol: "BANKNIFTY", name: "Nifty Bank", type: "Indices" },
+    { symbol: "SPX", name: "S&P 500", type: "Indices" },
+    { symbol: "NDX", name: "NASDAQ 100", type: "Indices" }
+];
+
+const apiKey = 'YIA0HZOTJCUEICY3';
 let searchTimeout = null;
 
 if (symbolInput && searchDropdown) {
@@ -450,26 +546,21 @@ if (symbolInput && searchDropdown) {
         }
 
         searchDropdown.style.display = "block";
-        let hasLocalResults = false;
+        let hasResults = false;
 
-        // 1. Show Instant Local Results First
-        const localMatches = localAssets.filter(item => 
+        const localResults = localAssets.filter(item => 
             item.symbol.includes(query) || item.name.toUpperCase().includes(query)
-        ).slice(0, 5);
+        ).slice(0, 6);
 
-        if (localMatches.length > 0) {
-            hasLocalResults = true;
-            localMatches.forEach(item => {
-                let badge = "";
-                if (item.exchange === "NSE") badge = `<span style="font-size: 0.7rem; background: #ffedd5; color: #f97316; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">NSE</span>`;
-                else if (item.type === "Forex" || item.type === "Crypto") badge = `<span style="font-size: 0.7rem; background: #e0e7ff; color: #4f46e5; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">Global</span>`;
-
+        if (localResults.length > 0) {
+            hasResults = true;
+            localResults.forEach(item => {
                 const div = document.createElement('div');
                 div.className = "search-item";
                 div.innerHTML = `
                     <div>
-                        <span class="symbol-name">${item.symbol}</span> ${badge}
-                        <br><small style="color:gray">${item.name} (Local)</small>
+                        <span class="symbol-name">${item.symbol}</span>
+                        <br><small style="color:gray">${item.name}</small>
                     </div>
                     <span class="market-type">${item.type}</span>
                 `;
@@ -481,94 +572,69 @@ if (symbolInput && searchDropdown) {
                 searchDropdown.appendChild(div);
             });
         }
-        
-        // 2. Add Loading indicator for the Live API
+
         const loadingDiv = document.createElement('div');
         loadingDiv.className = "search-item";
         loadingDiv.style.color = "gray";
         loadingDiv.style.fontSize = "0.8rem";
-        loadingDiv.innerHTML = `<em>Searching Yahoo Finance Live...</em>`;
+        loadingDiv.innerHTML = `<em>Searching live stocks...</em>`;
         searchDropdown.appendChild(loadingDiv);
 
         clearTimeout(searchTimeout);
-        
         searchTimeout = setTimeout(async () => {
             try {
-                const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`;
-                // Switch to /get endpoint to bypass Cloudflare block on raw requests
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
-                
-                const response = await fetch(proxyUrl);
-                if (!response.ok) throw new Error('Proxy network error');
-                
-                const proxyData = await response.json();
-                
+                const response = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${apiKey}`);
+                const data = await response.json();
+
                 if(searchDropdown.contains(loadingDiv)) {
                     searchDropdown.removeChild(loadingDiv);
                 }
 
-                // If proxyData.contents exists, parse it.
-                if (proxyData.contents) {
-                    const data = JSON.parse(proxyData.contents);
+                if (data.bestMatches && data.bestMatches.length > 0) {
+                    const stockResults = data.bestMatches.slice(0, 6);
                     
-                    if (data.quotes && data.quotes.length > 0) {
-                        data.quotes.forEach(item => {
-                            const symbol = item.symbol;
-                            const name = item.shortname || item.longname || "Unknown Asset";
-                            const type = item.quoteType;
-                            const exchangeDisp = item.exchDisp || "";
+                    if (stockResults.length > 0) hasResults = true;
 
-                            let marketType = "Stock";
-                            if (type === "INDEX") marketType = "Indices";
-                            if (type === "CURRENCY") marketType = "Forex";
-                            if (type === "CRYPTOCURRENCY") marketType = "Crypto";
+                    stockResults.forEach(item => {
+                        const symbol = item['1. symbol'];
+                        const name = item['2. name'] || "Unknown Stock";
+                        const type = item['3. type'];
+                        
+                        let marketType = "Stock";
+                        if (type === "ETF") marketType = "Indices";
 
-                            let exchangeBadge = "";
-                            if (symbol.endsWith(".NS") || exchangeDisp.includes("NSE")) {
-                                exchangeBadge = `<span style="font-size: 0.7rem; background: #ffedd5; color: #f97316; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">NSE</span>`;
-                            } else if (symbol.endsWith(".BO") || exchangeDisp.includes("BSE")) {
-                                exchangeBadge = `<span style="font-size: 0.7rem; background: #fef3c7; color: #f59e0b; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">BSE</span>`;
-                            } else if (marketType === "Forex" || marketType === "Crypto") {
-                                 exchangeBadge = `<span style="font-size: 0.7rem; background: #e0e7ff; color: #4f46e5; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">Global</span>`;
-                            }
+                        let exchangeBadge = "";
+                        if (symbol.endsWith(".BSE")) exchangeBadge = `<span style="font-size: 0.7rem; background: #fef3c7; color: #f59e0b; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">BSE</span>`;
 
-                            // Prevent duplicates if local already showed it
-                            if (!localMatches.some(loc => loc.symbol === symbol)) {
-                                const div = document.createElement('div');
-                                div.className = "search-item";
-                                div.innerHTML = `
-                                    <div>
-                                        <span class="symbol-name">${symbol}</span> ${exchangeBadge}
-                                        <br><small style="color:gray">${name}</small>
-                                    </div>
-                                    <span class="market-type">${marketType}</span>
-                                `;
-                                
-                                div.addEventListener('click', () => {
-                                    symbolInput.value = symbol;
-                                    marketSelect.value = marketType;
-                                    searchDropdown.style.display = "none";
-                                    
-                                    // Trigger the live price fetch immediately after selecting
-                                    fetchLivePrice(symbol);
-                                });
-                                searchDropdown.appendChild(div);
-                            }
+                        const div = document.createElement('div');
+                        div.className = "search-item";
+                        div.innerHTML = `
+                            <div>
+                                <span class="symbol-name">${symbol}</span> ${exchangeBadge}
+                                <br><small style="color:gray">${name}</small>
+                            </div>
+                            <span class="market-type">${marketType}</span>
+                        `;
+                        
+                        div.addEventListener('click', () => {
+                            symbolInput.value = symbol.replace('.BSE', '');
+                            marketSelect.value = marketType;
+                            searchDropdown.style.display = "none";
                         });
-                    } else if (!hasLocalResults) {
-                        searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found.</div>';
-                    }
-                } else {
-                     throw new Error('Yahoo blocked the request');
+                        searchDropdown.appendChild(div);
+                    });
+                }
+
+                if (!hasResults) {
+                    searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found.</div>';
                 }
             } catch (error) {
                 if(searchDropdown.contains(loadingDiv)) searchDropdown.removeChild(loadingDiv);
-                if (!hasLocalResults) {
-                    searchDropdown.innerHTML = '<div class="search-item" style="color:var(--danger); font-size: 0.85rem;">Live search unavailable. Please type manually.</div>';
+                if (!hasResults) {
+                    searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found in local database.</div>';
                 }
-                console.error("Live Search Proxy Error:", error);
             }
-        }, 600); 
+        }, 800); 
     });
 
     document.addEventListener('click', (e) => {
