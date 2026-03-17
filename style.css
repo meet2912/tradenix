@@ -107,4 +107,4 @@ body {
     .app-container { flex-direction: column; }
     .sidebar { width: 100%; border-right: none; border-bottom: 1px solid var(--border-light); }
     .main-content { padding: 20px; }
-} 
+}
