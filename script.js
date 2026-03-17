@@ -1,4 +1,3 @@
-
 // --- DOM ELEMENTS ---
 const authContainer = document.getElementById('auth-container');
 const dashboardContainer = document.getElementById('dashboard-container');
@@ -103,12 +102,20 @@ loginForm.addEventListener('submit', (e) => {
     const username = document.getElementById('login-username').value.trim();
     const password = document.getElementById('login-password').value;
     
-    if (localStorage.getItem(`user_${username}`) === password) {
+    const savedPassword = localStorage.getItem(`user_${username}`);
+    
+    if (!savedPassword) {
+        errorMsg.innerText = "Account not found. Please click 'Create an account' first.";
+        return;
+    }
+
+    if (savedPassword === password) {
         const userDetails = JSON.parse(localStorage.getItem(`details_${username}`));
+        errorMsg.innerText = ""; 
         showToast('Logged in successfully!');
         loginUser(username, userDetails ? userDetails.fullname : username);
     } else {
-        errorMsg.innerText = "Invalid credentials.";
+        errorMsg.innerText = "Incorrect password. Please try again.";
     }
 });
 
@@ -349,7 +356,7 @@ if (exportCsvBtn) {
         const link = document.createElement("a");
         link.setAttribute("href", url);
         const today = new Date().toISOString().split('T')[0];
-        link.setAttribute("download", `ProTrade_Journal_${today}.csv`);
+        link.setAttribute("download", `Tradenix_Journal_${today}.csv`);
         
         document.body.appendChild(link);
         link.click();
@@ -372,30 +379,12 @@ const localAssets = [
     { symbol: "AUD/USD", name: "Australian Dollar / US Dollar", type: "Forex" },
     { symbol: "USD/CAD", name: "US Dollar / Canadian Dollar", type: "Forex" },
     { symbol: "NZD/USD", name: "New Zealand Dollar / US Dollar", type: "Forex" },
-    { symbol: "EUR/JPY", name: "Euro / Japanese Yen", type: "Forex" },
-    { symbol: "GBP/JPY", name: "British Pound / Japanese Yen", type: "Forex" },
-    { symbol: "EUR/GBP", name: "Euro / British Pound", type: "Forex" },
-    { symbol: "AUD/JPY", name: "Australian Dollar / Japanese Yen", type: "Forex" },
-    { symbol: "EUR/AUD", name: "Euro / Australian Dollar", type: "Forex" },
-    { symbol: "EUR/CAD", name: "Euro / Canadian Dollar", type: "Forex" },
-    { symbol: "USD/INR", name: "US Dollar / Indian Rupee", type: "Forex" },
-    { symbol: "EUR/INR", name: "Euro / Indian Rupee", type: "Forex" },
-    { symbol: "GBP/INR", name: "British Pound / Indian Rupee", type: "Forex" },
-    { symbol: "JPY/INR", name: "Japanese Yen / Indian Rupee", type: "Forex" },
     { symbol: "BTC/USD", name: "Bitcoin", type: "Crypto" },
     { symbol: "ETH/USD", name: "Ethereum", type: "Crypto" },
-    { symbol: "SOL/USD", name: "Solana", type: "Crypto" },
-    { symbol: "XRP/USD", name: "Ripple", type: "Crypto" },
-    { symbol: "ADA/USD", name: "Cardano", type: "Crypto" },
-    { symbol: "DOGE/USD", name: "Dogecoin", type: "Crypto" },
     { symbol: "NIFTY", name: "Nifty 50", type: "Indices" },
     { symbol: "BANKNIFTY", name: "Nifty Bank", type: "Indices" },
-    { symbol: "FINNIFTY", name: "Nifty Financial Services", type: "Indices" },
-    { symbol: "SENSEX", name: "BSE Sensex", type: "Indices" },
-    { symbol: "INDIAVIX", name: "India VIX", type: "Indices" },
     { symbol: "SPX", name: "S&P 500", type: "Indices" },
-    { symbol: "NDX", name: "NASDAQ 100", type: "Indices" },
-    { symbol: "DJI", name: "Dow Jones Industrial", type: "Indices" }
+    { symbol: "NDX", name: "NASDAQ 100", type: "Indices" }
 ];
 
 const apiKey = 'YIA0HZOTJCUEICY3';
