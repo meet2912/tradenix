@@ -366,28 +366,77 @@ if (exportCsvBtn) {
     });
 }
 
-// --- HYBRID SEARCH (Instant Local + Live Alpha Vantage API) ---
+// --- LOCAL ASSETS FALLBACK ---
+const localAssets = [
+    { symbol: "RELIANCE", name: "Reliance Industries", type: "Stock", exchange: "NSE" },
+    { symbol: "TCS", name: "Tata Consultancy Services", type: "Stock", exchange: "NSE" },
+    { symbol: "HDFCBANK", name: "HDFC Bank", type: "Stock", exchange: "NSE" },
+    { symbol: "ICICIBANK", name: "ICICI Bank", type: "Stock", exchange: "NSE" },
+    { symbol: "INFY", name: "Infosys", type: "Stock", exchange: "NSE" },
+    { symbol: "SBIN", name: "State Bank of India", type: "Stock", exchange: "NSE" },
+    { symbol: "BHARTIARTL", name: "Bharti Airtel", type: "Stock", exchange: "NSE" },
+    { symbol: "ITC", name: "ITC Limited", type: "Stock", exchange: "NSE" },
+    { symbol: "LT", name: "Larsen & Toubro", type: "Stock", exchange: "NSE" },
+    { symbol: "BAJFINANCE", name: "Bajaj Finance", type: "Stock", exchange: "NSE" },
+    { symbol: "TATAMOTORS", name: "Tata Motors", type: "Stock", exchange: "NSE" },
+    { symbol: "NTPC", name: "NTPC Limited", type: "Stock", exchange: "NSE" },
+    { symbol: "KOTAKBANK", name: "Kotak Mahindra Bank", type: "Stock", exchange: "NSE" },
+    { symbol: "AXISBANK", name: "Axis Bank", type: "Stock", exchange: "NSE" },
+    { symbol: "M&M", name: "Mahindra & Mahindra", type: "Stock", exchange: "NSE" },
+    { symbol: "MARUTI", name: "Maruti Suzuki", type: "Stock", exchange: "NSE" },
+    { symbol: "ULTRACEMCO", name: "UltraTech Cement", type: "Stock", exchange: "NSE" },
+    { symbol: "ASIANPAINT", name: "Asian Paints", type: "Stock", exchange: "NSE" },
+    { symbol: "SUNPHARMA", name: "Sun Pharmaceutical", type: "Stock", exchange: "NSE" },
+    { symbol: "TITAN", name: "Titan Company", type: "Stock", exchange: "NSE" },
+    { symbol: "EUR/USD", name: "Euro / US Dollar", type: "Forex" },
+    { symbol: "GBP/USD", name: "British Pound / US Dollar", type: "Forex" },
+    { symbol: "USD/JPY", name: "US Dollar / Japanese Yen", type: "Forex" },
+    { symbol: "BTC/USD", name: "Bitcoin", type: "Crypto" },
+    { symbol: "ETH/USD", name: "Ethereum", type: "Crypto" },
+    { symbol: "NIFTY", name: "Nifty 50", type: "Indices", exchange: "NSE" },
+    { symbol: "BANKNIFTY", name: "Nifty Bank", type: "Indices", exchange: "NSE" }
+];
+
+// --- FETCH LIVE CURRENT MARKET PRICE ---
+async function fetchLivePrice(symbol) {
+    const entryInput = document.getElementById('trade-entry');
+    entryInput.placeholder = "Fetching live price...";
+    
+    try {
+        const yahooUrl = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${encodeURIComponent(symbol)}`;
+        // Updated to the secure /get proxy
+        const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
+        
+        const response = await fetch(proxyUrl);
+        if (!response.ok) throw new Error('Network error');
+        
+        const proxyData = await response.json();
+        if (!proxyData.contents) throw new Error('Proxy blocked');
+
+        const data = JSON.parse(proxyData.contents);
+        
+        if (data.quoteResponse && data.quoteResponse.result && data.quoteResponse.result.length > 0) {
+            const price = data.quoteResponse.result[0].regularMarketPrice;
+            if (price) {
+                const decimalPlaces = price < 10 ? 4 : 2; 
+                entryInput.value = price.toFixed(decimalPlaces);
+                showToast(`Live price fetched for ${symbol}`);
+            } else {
+                entryInput.placeholder = "0.00";
+            }
+        }
+    } catch (error) {
+        console.error("Live Price Proxy Error:", error);
+        entryInput.placeholder = "0.00";
+        showToast("Could not fetch live price.");
+    }
+}
+
+// --- LIVE YAHOO FINANCE SEARCH (Proxied safely) ---
 const symbolInput = document.getElementById('trade-symbol');
 const searchDropdown = document.getElementById('search-results');
 const marketSelect = document.getElementById('trade-market');
 
-const localAssets = [
-    { symbol: "EUR/USD", name: "Euro / US Dollar", type: "Forex" },
-    { symbol: "GBP/USD", name: "British Pound / US Dollar", type: "Forex" },
-    { symbol: "USD/JPY", name: "US Dollar / Japanese Yen", type: "Forex" },
-    { symbol: "USD/CHF", name: "US Dollar / Swiss Franc", type: "Forex" },
-    { symbol: "AUD/USD", name: "Australian Dollar / US Dollar", type: "Forex" },
-    { symbol: "USD/CAD", name: "US Dollar / Canadian Dollar", type: "Forex" },
-    { symbol: "NZD/USD", name: "New Zealand Dollar / US Dollar", type: "Forex" },
-    { symbol: "BTC/USD", name: "Bitcoin", type: "Crypto" },
-    { symbol: "ETH/USD", name: "Ethereum", type: "Crypto" },
-    { symbol: "NIFTY", name: "Nifty 50", type: "Indices" },
-    { symbol: "BANKNIFTY", name: "Nifty Bank", type: "Indices" },
-    { symbol: "SPX", name: "S&P 500", type: "Indices" },
-    { symbol: "NDX", name: "NASDAQ 100", type: "Indices" }
-];
-
-const apiKey = 'YIA0HZOTJCUEICY3';
 let searchTimeout = null;
 
 if (symbolInput && searchDropdown) {
@@ -401,21 +450,26 @@ if (symbolInput && searchDropdown) {
         }
 
         searchDropdown.style.display = "block";
-        let hasResults = false;
+        let hasLocalResults = false;
 
-        const localResults = localAssets.filter(item => 
+        // 1. Show Instant Local Results First
+        const localMatches = localAssets.filter(item => 
             item.symbol.includes(query) || item.name.toUpperCase().includes(query)
-        ).slice(0, 6);
+        ).slice(0, 5);
 
-        if (localResults.length > 0) {
-            hasResults = true;
-            localResults.forEach(item => {
+        if (localMatches.length > 0) {
+            hasLocalResults = true;
+            localMatches.forEach(item => {
+                let badge = "";
+                if (item.exchange === "NSE") badge = `<span style="font-size: 0.7rem; background: #ffedd5; color: #f97316; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">NSE</span>`;
+                else if (item.type === "Forex" || item.type === "Crypto") badge = `<span style="font-size: 0.7rem; background: #e0e7ff; color: #4f46e5; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">Global</span>`;
+
                 const div = document.createElement('div');
                 div.className = "search-item";
                 div.innerHTML = `
                     <div>
-                        <span class="symbol-name">${item.symbol}</span>
-                        <br><small style="color:gray">${item.name}</small>
+                        <span class="symbol-name">${item.symbol}</span> ${badge}
+                        <br><small style="color:gray">${item.name} (Local)</small>
                     </div>
                     <span class="market-type">${item.type}</span>
                 `;
@@ -427,69 +481,94 @@ if (symbolInput && searchDropdown) {
                 searchDropdown.appendChild(div);
             });
         }
-
+        
+        // 2. Add Loading indicator for the Live API
         const loadingDiv = document.createElement('div');
         loadingDiv.className = "search-item";
         loadingDiv.style.color = "gray";
         loadingDiv.style.fontSize = "0.8rem";
-        loadingDiv.innerHTML = `<em>Searching live stocks...</em>`;
+        loadingDiv.innerHTML = `<em>Searching Yahoo Finance Live...</em>`;
         searchDropdown.appendChild(loadingDiv);
 
         clearTimeout(searchTimeout);
+        
         searchTimeout = setTimeout(async () => {
             try {
-                const response = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${apiKey}`);
-                const data = await response.json();
-
+                const yahooUrl = `https://query2.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`;
+                // Switch to /get endpoint to bypass Cloudflare block on raw requests
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(yahooUrl)}`;
+                
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error('Proxy network error');
+                
+                const proxyData = await response.json();
+                
                 if(searchDropdown.contains(loadingDiv)) {
                     searchDropdown.removeChild(loadingDiv);
                 }
 
-                if (data.bestMatches && data.bestMatches.length > 0) {
-                    const stockResults = data.bestMatches.slice(0, 6);
+                // If proxyData.contents exists, parse it.
+                if (proxyData.contents) {
+                    const data = JSON.parse(proxyData.contents);
                     
-                    if (stockResults.length > 0) hasResults = true;
+                    if (data.quotes && data.quotes.length > 0) {
+                        data.quotes.forEach(item => {
+                            const symbol = item.symbol;
+                            const name = item.shortname || item.longname || "Unknown Asset";
+                            const type = item.quoteType;
+                            const exchangeDisp = item.exchDisp || "";
 
-                    stockResults.forEach(item => {
-                        const symbol = item['1. symbol'];
-                        const name = item['2. name'] || "Unknown Stock";
-                        const type = item['3. type'];
-                        
-                        let marketType = "Stock";
-                        if (type === "ETF") marketType = "Indices";
+                            let marketType = "Stock";
+                            if (type === "INDEX") marketType = "Indices";
+                            if (type === "CURRENCY") marketType = "Forex";
+                            if (type === "CRYPTOCURRENCY") marketType = "Crypto";
 
-                        let exchangeBadge = "";
-                        if (symbol.endsWith(".BSE")) exchangeBadge = `<span style="font-size: 0.7rem; background: #fef3c7; color: #f59e0b; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">BSE</span>`;
+                            let exchangeBadge = "";
+                            if (symbol.endsWith(".NS") || exchangeDisp.includes("NSE")) {
+                                exchangeBadge = `<span style="font-size: 0.7rem; background: #ffedd5; color: #f97316; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">NSE</span>`;
+                            } else if (symbol.endsWith(".BO") || exchangeDisp.includes("BSE")) {
+                                exchangeBadge = `<span style="font-size: 0.7rem; background: #fef3c7; color: #f59e0b; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">BSE</span>`;
+                            } else if (marketType === "Forex" || marketType === "Crypto") {
+                                 exchangeBadge = `<span style="font-size: 0.7rem; background: #e0e7ff; color: #4f46e5; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">Global</span>`;
+                            }
 
-                        const div = document.createElement('div');
-                        div.className = "search-item";
-                        div.innerHTML = `
-                            <div>
-                                <span class="symbol-name">${symbol}</span> ${exchangeBadge}
-                                <br><small style="color:gray">${name}</small>
-                            </div>
-                            <span class="market-type">${marketType}</span>
-                        `;
-                        
-                        div.addEventListener('click', () => {
-                            symbolInput.value = symbol.replace('.BSE', '');
-                            marketSelect.value = marketType;
-                            searchDropdown.style.display = "none";
+                            // Prevent duplicates if local already showed it
+                            if (!localMatches.some(loc => loc.symbol === symbol)) {
+                                const div = document.createElement('div');
+                                div.className = "search-item";
+                                div.innerHTML = `
+                                    <div>
+                                        <span class="symbol-name">${symbol}</span> ${exchangeBadge}
+                                        <br><small style="color:gray">${name}</small>
+                                    </div>
+                                    <span class="market-type">${marketType}</span>
+                                `;
+                                
+                                div.addEventListener('click', () => {
+                                    symbolInput.value = symbol;
+                                    marketSelect.value = marketType;
+                                    searchDropdown.style.display = "none";
+                                    
+                                    // Trigger the live price fetch immediately after selecting
+                                    fetchLivePrice(symbol);
+                                });
+                                searchDropdown.appendChild(div);
+                            }
                         });
-                        searchDropdown.appendChild(div);
-                    });
-                }
-
-                if (!hasResults) {
-                    searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found.</div>';
+                    } else if (!hasLocalResults) {
+                        searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found.</div>';
+                    }
+                } else {
+                     throw new Error('Yahoo blocked the request');
                 }
             } catch (error) {
                 if(searchDropdown.contains(loadingDiv)) searchDropdown.removeChild(loadingDiv);
-                if (!hasResults) {
-                    searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found in local database.</div>';
+                if (!hasLocalResults) {
+                    searchDropdown.innerHTML = '<div class="search-item" style="color:var(--danger); font-size: 0.85rem;">Live search unavailable. Please type manually.</div>';
                 }
+                console.error("Live Search Proxy Error:", error);
             }
-        }, 800); 
+        }, 600); 
     });
 
     document.addEventListener('click', (e) => {
