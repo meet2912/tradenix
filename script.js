@@ -1,182 +1,511 @@
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-import { 
-    getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-    GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut 
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
-import { 
-    getFirestore, collection, addDoc, getDocs, query, where 
-} from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
 
-// YOUR CORRECT FIREBASE CONFIG
-const firebaseConfig = {
-    apiKey: "AIzaSyBkTk1OIdjo_hOR5BROuC5KWI6ThKnTvQk",
-    authDomain: "tradenix-28334.firebaseapp.com",
-    projectId: "tradenix-28334",
-    storageBucket: "tradenix-28334.firebasestorage.app",
-    messagingSenderId: "735443885282",
-    appId: "1:735443885282:web:3d93b4a11b60a63dbad2bb"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-let userUID = null;
-let isLoginMode = true;
-
-// DOM Elements
-const authScreen = document.getElementById('auth-screen');
-const appScreen = document.getElementById('app-screen');
+// --- DOM ELEMENTS ---
+const authContainer = document.getElementById('auth-container');
+const dashboardContainer = document.getElementById('dashboard-container');
+const loginForm = document.getElementById('login-form');
+const signupForm = document.getElementById('signup-form');
 const errorMsg = document.getElementById('auth-error');
+const displayName = document.getElementById('display-name');
+const avatarInitial = document.getElementById('avatar-initial');
+const toastEl = document.getElementById('toast');
 
-// Toggle Elements
-const authForm = document.getElementById('auth-form');
-const authTitle = document.getElementById('auth-title');
-const authSubtitle = document.getElementById('auth-subtitle');
-const mainAuthBtn = document.getElementById('main-auth-btn');
-const toggleAuth = document.getElementById('toggle-auth');
-const switchText = document.getElementById('switch-text');
+const navItems = document.querySelectorAll('.nav-item');
+const contentSections = document.querySelectorAll('.content-section');
+const newTradeForm = document.getElementById('new-trade-form');
+const tradeBody = document.getElementById('trade-body');
+const notebookArea = document.getElementById('notebook-textarea');
+const exportCsvBtn = document.getElementById('export-csv-btn');
 
 // Profile Modal Elements
+const userProfileBtn = document.getElementById('user-profile-btn');
 const profileModal = document.getElementById('profile-modal');
-const openProfileBtn = document.getElementById('open-profile-btn');
-const closeModalBtn = document.getElementById('close-modal-btn');
+const closeProfileBtn = document.getElementById('close-profile-btn');
 const modalLogoutBtn = document.getElementById('modal-logout-btn');
+const avatarUpload = document.getElementById('avatar-upload');
 
-function showError(message) {
-    errorMsg.innerText = message;
-    errorMsg.style.display = "block";
+let currentUser = null;
+let outcomeChartInstance = null;
+
+// --- TOAST NOTIFICATION ---
+function showToast(message) {
+    toastEl.innerText = message;
+    toastEl.classList.add('show');
+    setTimeout(() => toastEl.classList.remove('show'), 3000);
+}
+
+// --- AVATAR DISPLAY FUNCTION ---
+function updateAvatarDisplay(base64String) {
+    const sidebarImg = document.getElementById('sidebar-avatar-img');
+    const sidebarInit = document.getElementById('avatar-initial');
+    const modalImg = document.getElementById('modal-avatar-img');
+    const modalInit = document.getElementById('modal-avatar');
+
+    if (base64String) {
+        sidebarImg.src = base64String;
+        sidebarImg.style.display = 'block';
+        sidebarInit.style.display = 'none';
+
+        modalImg.src = base64String;
+        modalImg.style.display = 'block';
+        modalInit.style.display = 'none';
+    } else {
+        sidebarImg.style.display = 'none';
+        sidebarInit.style.display = 'flex';
+
+        modalImg.style.display = 'none';
+        modalInit.style.display = 'flex';
+    }
+}
+
+// --- INITIALIZATION ---
+window.onload = () => {
+    const activeUser = localStorage.getItem('activeUser');
+    if (activeUser) {
+        currentUser = activeUser;
+        const userDetails = JSON.parse(localStorage.getItem(`details_${activeUser}`));
+        loadDashboard(userDetails ? userDetails.fullname : activeUser);
+    }
+};
+
+// --- AUTHENTICATION LOGIC ---
+function toggleAuth(type) {
+    errorMsg.innerText = "";
+    if (type === 'signup') {
+        loginForm.classList.remove('active-form');
+        signupForm.classList.add('active-form');
+    } else {
+        signupForm.classList.remove('active-form');
+        loginForm.classList.add('active-form');
+    }
+}
+
+signupForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const fullname = document.getElementById('reg-fullname').value.trim();
+    const email = document.getElementById('reg-email').value.trim();
+    const dob = document.getElementById('reg-dob').value;
+    const username = document.getElementById('reg-username').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const confirm = document.getElementById('reg-confirm').value;
+
+    if (password !== confirm) { errorMsg.innerText = "Passwords do not match."; return; }
+    if (localStorage.getItem(`user_${username}`)) { errorMsg.innerText = "Username taken."; return; }
+
+    localStorage.setItem(`user_${username}`, password);
+    localStorage.setItem(`details_${username}`, JSON.stringify({ fullname, email, dob }));
+    
+    showToast('Account created successfully!');
+    loginUser(username, fullname);
+});
+
+loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = document.getElementById('login-username').value.trim();
+    const password = document.getElementById('login-password').value;
+    
+    if (localStorage.getItem(`user_${username}`) === password) {
+        const userDetails = JSON.parse(localStorage.getItem(`details_${username}`));
+        showToast('Logged in successfully!');
+        loginUser(username, userDetails ? userDetails.fullname : username);
+    } else {
+        errorMsg.innerText = "Invalid credentials.";
+    }
+});
+
+function loginUser(username, fullname) {
+    currentUser = username;
+    localStorage.setItem('activeUser', username);
+    loadDashboard(fullname);
+}
+
+function loadDashboard(name) {
+    authContainer.classList.remove('active');
+    dashboardContainer.classList.add('active');
+    
+    displayName.innerText = name;
+    avatarInitial.innerText = name.charAt(0).toUpperCase();
+    
+    const savedAvatar = localStorage.getItem(`avatar_${currentUser}`);
+    updateAvatarDisplay(savedAvatar);
+    
+    loadTrades();
+    loadNotebook();
 }
 
 // --- PROFILE MODAL LOGIC ---
-openProfileBtn.addEventListener('click', () => {
-    profileModal.style.display = 'flex';
-});
-closeModalBtn.addEventListener('click', () => {
-    profileModal.style.display = 'none';
-});
-// Close modal if user clicks the dark background outside the card
-profileModal.addEventListener('click', (e) => {
-    if (e.target === profileModal) profileModal.style.display = 'none';
-});
-
-// --- TOGGLE BETWEEN LOGIN & SIGNUP ---
-toggleAuth.addEventListener('click', (e) => {
-    e.preventDefault();
-    isLoginMode = !isLoginMode;
-    errorMsg.style.display = "none";
-    
-    if(isLoginMode) {
-        authTitle.innerText = "Welcome Back";
-        authSubtitle.innerText = "Enter your credentials to access your dashboard.";
-        mainAuthBtn.innerText = "Log In";
-        switchText.innerText = "New here? ";
-        toggleAuth.innerText = "Create an account";
-    } else {
-        authTitle.innerText = "Create Account";
-        authSubtitle.innerText = "Sign up to start your trading journal.";
-        mainAuthBtn.innerText = "Sign Up";
-        switchText.innerText = "Already have an account? ";
-        toggleAuth.innerText = "Log In";
-    }
-});
-
-// --- SUBMIT AUTH FORM ---
-authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('auth-email').value;
-    const pass = document.getElementById('auth-password').value;
-    errorMsg.style.display = "none";
-
-    if(isLoginMode) {
-        try { await signInWithEmailAndPassword(auth, email, pass); } 
-        catch (err) { showError("Incorrect email or password."); }
-    } else {
-        if (pass.length < 6) return showError("Password must be at least 6 characters.");
-        try { await createUserWithEmailAndPassword(auth, email, pass); } 
-        catch (err) { showError(err.message); }
-    }
-});
-
-// Google Sign-In
-document.getElementById('google-btn').addEventListener('click', async () => {
-    try { await signInWithPopup(auth, new GoogleAuthProvider()); } 
-    catch (err) { showError(err.message); }
-});
-
-// Logout (Now triggered from inside the Profile Modal)
-modalLogoutBtn.addEventListener('click', () => {
-    signOut(auth);
-    profileModal.style.display = 'none';
-});
-
-// Watcher
-onAuthStateChanged(auth, (user) => {
-    if (user) {
-        userUID = user.uid;
-        authScreen.style.display = "none";
-        appScreen.style.display = "flex";
+if (userProfileBtn) {
+    userProfileBtn.addEventListener('click', () => {
+        const userDetails = JSON.parse(localStorage.getItem(`details_${currentUser}`));
         
-        // Populate profile modal with actual user data
-        if (user.email) {
-            document.getElementById('modal-email').innerText = user.email;
-            document.getElementById('modal-avatar-letter').innerText = user.email.charAt(0).toUpperCase();
-            document.getElementById('sidebar-avatar').innerText = user.email.charAt(0).toUpperCase();
+        document.getElementById('modal-avatar').innerText = (userDetails?.fullname || currentUser).charAt(0).toUpperCase();
+        document.getElementById('modal-name').innerText = userDetails?.fullname || currentUser;
+        document.getElementById('modal-email').innerText = userDetails?.email || 'N/A';
+        document.getElementById('modal-username').innerText = currentUser;
+        
+        if (userDetails?.dob) {
+            const parts = userDetails.dob.split('-');
+            document.getElementById('modal-dob').innerText = `${parts[1]}/${parts[2]}/${parts[0]}`;
+        } else {
+            document.getElementById('modal-dob').innerText = 'N/A';
         }
+
+        const savedAvatar = localStorage.getItem(`avatar_${currentUser}`);
+        updateAvatarDisplay(savedAvatar);
         
-        loadDashboardStats();
-    } else {
-        userUID = null;
-        authScreen.style.display = "flex";
-        appScreen.style.display = "none";
-    }
+        profileModal.classList.add('active');
+    });
+}
+
+if (avatarUpload) {
+    avatarUpload.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const base64String = event.target.result;
+                localStorage.setItem(`avatar_${currentUser}`, base64String);
+                updateAvatarDisplay(base64String);
+                showToast("Profile photo updated!");
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+if (closeProfileBtn) closeProfileBtn.addEventListener('click', () => profileModal.classList.remove('active'));
+if (profileModal) profileModal.addEventListener('click', (e) => { if(e.target === profileModal) profileModal.classList.remove('active'); });
+
+if (modalLogoutBtn) {
+    modalLogoutBtn.addEventListener('click', () => {
+        profileModal.classList.remove('active');
+        localStorage.removeItem('activeUser');
+        currentUser = null;
+        dashboardContainer.classList.remove('active');
+        authContainer.classList.add('active');
+        toggleAuth('login');
+    });
+}
+
+// --- NAVIGATION (SPA TAB SWITCHING) ---
+navItems.forEach(item => {
+    item.addEventListener('click', (e) => {
+        e.preventDefault();
+        navItems.forEach(nav => nav.classList.remove('active'));
+        contentSections.forEach(sec => sec.classList.remove('active'));
+        
+        item.classList.add('active');
+        document.getElementById(item.getAttribute('data-target')).classList.add('active');
+    });
 });
 
-// --- SAVE TRADE ---
-document.getElementById('new-trade-form').addEventListener('submit', async (e) => {
-    e.preventDefault();
-    if (!userUID) return;
+// --- DATE FORMATTER (MM/DD/YY) ---
+function formatDate(dateString) {
+    const parts = dateString.split('-');
+    if(parts.length !== 3) return dateString;
+    const year = parts[0].substring(2); 
+    const month = parts[1];
+    const day = parts[2];
+    return `${month}/${day}/${year}`;
+}
 
-    const tradeData = {
-        uid: userUID,
+// --- NEW TRADE FORM LOGIC ---
+newTradeForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    
+    const rawDate = document.getElementById('trade-date').value;
+    
+    const trade = {
+        id: Date.now(),
+        date: formatDate(rawDate),
+        market: document.getElementById('trade-market').value,
         symbol: document.getElementById('trade-symbol').value.toUpperCase(),
         outcome: document.getElementById('trade-outcome').value,
-        date: document.getElementById('trade-date').value,
-        timestamp: Date.now()
+        entry: document.getElementById('trade-entry').value,
+        exit: document.getElementById('trade-exit').value,
+        notes: document.getElementById('trade-notes').value
     };
 
-    try {
-        await addDoc(collection(db, "trades"), tradeData);
-        e.target.reset();
-        document.getElementById('trade-date').valueAsDate = new Date();
-        loadDashboardStats();
-    } catch (err) {
-        alert("Sync Error: " + err.message);
-    }
+    let trades = JSON.parse(localStorage.getItem(`trades_${currentUser}`)) || [];
+    trades.push(trade);
+    localStorage.setItem(`trades_${currentUser}`, JSON.stringify(trades));
+    
+    newTradeForm.reset();
+    showToast('Trade analyzed and saved!');
+    loadTrades();
+    
+    document.querySelector('[data-target="view-dashboard"]').click();
 });
 
-// --- CALCULATE STATS ---
-async function loadDashboardStats() {
-    const q = query(collection(db, "trades"), where("uid", "==", userUID));
-    const snap = await getDocs(q);
+// --- CHART RENDERING LOGIC ---
+function renderChart(targets, stoplosses, breakevens) {
+    const ctx = document.getElementById('outcomeChart');
+    if (!ctx) return;
+
+    if (outcomeChartInstance) {
+        outcomeChartInstance.destroy();
+    }
+
+    if (targets === 0 && stoplosses === 0 && breakevens === 0) {
+        return; 
+    }
+
+    outcomeChartInstance = new Chart(ctx.getContext('2d'), {
+        type: 'doughnut',
+        data: {
+            labels: ['Targets Hit', 'Stoplosses', 'Breakevens'],
+            datasets: [{
+                data: [targets, stoplosses, breakevens],
+                backgroundColor: ['#10b981', '#ef4444', '#f59e0b'],
+                borderWidth: 0,
+                hoverOffset: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '75%',
+            plugins: {
+                legend: { position: 'bottom', labels: { color: '#6b7280', font: { family: 'Inter', size: 13 } } }
+            }
+        }
+    });
+}
+
+// --- LOAD TRADES & CALCULATE STATS ---
+function loadTrades() {
+    tradeBody.innerHTML = "";
+    let trades = JSON.parse(localStorage.getItem(`trades_${currentUser}`)) || [];
     
-    let total = 0;
-    let targetsHit = 0;
-    let stopsHit = 0;
+    let targets = 0;
+    let stoplosses = 0;
     let breakevens = 0;
-    
-    snap.forEach(doc => {
-        total++;
-        const outcome = doc.data().outcome;
-        if (outcome === "Target") targetsHit++;
-        else if (outcome === "Stoploss") stopsHit++;
-        else if (outcome === "Breakeven") breakevens++;
+
+    [...trades].reverse().forEach(trade => {
+        if(trade.outcome === 'Target') targets++;
+        if(trade.outcome === 'Stoploss') stoplosses++;
+        if(trade.outcome === 'Breakeven') breakevens++;
+
+        const row = document.createElement('tr');
+        
+        let outcomeClass = '';
+        if(trade.outcome === 'Target') outcomeClass = 'outcome-target';
+        if(trade.outcome === 'Stoploss') outcomeClass = 'outcome-stoploss';
+        if(trade.outcome === 'Breakeven') outcomeClass = 'outcome-breakeven';
+
+        row.innerHTML = `
+            <td>${trade.date}</td>
+            <td><span class="asset-tag">${trade.symbol}</span> <span style="font-size:0.8rem; color:var(--text-muted); margin-left:5px;">${trade.market}</span></td>
+            <td>${trade.entry}</td>
+            <td>${trade.exit}</td>
+            <td><span class="outcome-badge ${outcomeClass}">${trade.outcome}</span></td>
+            <td style="color:var(--text-muted); font-size:0.85rem;">${trade.notes ? trade.notes.substring(0, 35) + '...' : '-'}</td>
+        `;
+        tradeBody.appendChild(row);
     });
 
-    const winRate = total > 0 ? Math.round((targetsHit / total) * 100) : 0;
-    
-    document.getElementById('stat-winrate').innerText = winRate + "%";
-    document.getElementById('stat-wins').innerText = targetsHit;
-    document.getElementById('stat-losses').innerText = stopsHit;
-    document.getElementById('stat-be').innerText = breakevens;
+    document.getElementById('dash-targets').innerText = targets;
+    document.getElementById('dash-stoplosses').innerText = stoplosses;
+    document.getElementById('dash-breakevens').innerText = breakevens;
+
+    const winRate = trades.length > 0 ? ((targets / trades.length) * 100).toFixed(1) : 0;
+    document.getElementById('dash-winrate').innerText = `${winRate}%`;
+
+    renderChart(targets, stoplosses, breakevens);
+}
+
+// --- NOTEBOOK AUTO-SAVE LOGIC ---
+function loadNotebook() {
+    if (notebookArea) {
+        notebookArea.value = localStorage.getItem(`notes_${currentUser}`) || "";
+    }
+}
+if (notebookArea) {
+    notebookArea.addEventListener('input', () => {
+        localStorage.setItem(`notes_${currentUser}`, notebookArea.value);
+    });
+}
+
+// --- EXPORT TO CSV LOGIC ---
+if (exportCsvBtn) {
+    exportCsvBtn.addEventListener('click', () => {
+        let trades = JSON.parse(localStorage.getItem(`trades_${currentUser}`)) || [];
+        
+        if (trades.length === 0) {
+            showToast("No trades to export yet!");
+            return;
+        }
+
+        const headers = ["Date", "Market", "Symbol", "Entry Price", "Exit Price", "Outcome", "Notes"];
+        
+        const csvRows = trades.map(trade => {
+            const safeNotes = trade.notes ? `"${trade.notes.replace(/"/g, '""')}"` : '""';
+            return [trade.date, trade.market, trade.symbol, trade.entry, trade.exit, trade.outcome, safeNotes].join(",");
+        });
+
+        const csvContent = [headers.join(","), ...csvRows].join("\n");
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        const today = new Date().toISOString().split('T')[0];
+        link.setAttribute("download", `ProTrade_Journal_${today}.csv`);
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        document.body.removeChild(link);
+        showToast("Journal exported to CSV!");
+    });
+}
+
+// --- HYBRID SEARCH (Instant Local + Live Alpha Vantage API) ---
+const symbolInput = document.getElementById('trade-symbol');
+const searchDropdown = document.getElementById('search-results');
+const marketSelect = document.getElementById('trade-market');
+
+const localAssets = [
+    { symbol: "EUR/USD", name: "Euro / US Dollar", type: "Forex" },
+    { symbol: "GBP/USD", name: "British Pound / US Dollar", type: "Forex" },
+    { symbol: "USD/JPY", name: "US Dollar / Japanese Yen", type: "Forex" },
+    { symbol: "USD/CHF", name: "US Dollar / Swiss Franc", type: "Forex" },
+    { symbol: "AUD/USD", name: "Australian Dollar / US Dollar", type: "Forex" },
+    { symbol: "USD/CAD", name: "US Dollar / Canadian Dollar", type: "Forex" },
+    { symbol: "NZD/USD", name: "New Zealand Dollar / US Dollar", type: "Forex" },
+    { symbol: "EUR/JPY", name: "Euro / Japanese Yen", type: "Forex" },
+    { symbol: "GBP/JPY", name: "British Pound / Japanese Yen", type: "Forex" },
+    { symbol: "EUR/GBP", name: "Euro / British Pound", type: "Forex" },
+    { symbol: "AUD/JPY", name: "Australian Dollar / Japanese Yen", type: "Forex" },
+    { symbol: "EUR/AUD", name: "Euro / Australian Dollar", type: "Forex" },
+    { symbol: "EUR/CAD", name: "Euro / Canadian Dollar", type: "Forex" },
+    { symbol: "USD/INR", name: "US Dollar / Indian Rupee", type: "Forex" },
+    { symbol: "EUR/INR", name: "Euro / Indian Rupee", type: "Forex" },
+    { symbol: "GBP/INR", name: "British Pound / Indian Rupee", type: "Forex" },
+    { symbol: "JPY/INR", name: "Japanese Yen / Indian Rupee", type: "Forex" },
+    { symbol: "BTC/USD", name: "Bitcoin", type: "Crypto" },
+    { symbol: "ETH/USD", name: "Ethereum", type: "Crypto" },
+    { symbol: "SOL/USD", name: "Solana", type: "Crypto" },
+    { symbol: "XRP/USD", name: "Ripple", type: "Crypto" },
+    { symbol: "ADA/USD", name: "Cardano", type: "Crypto" },
+    { symbol: "DOGE/USD", name: "Dogecoin", type: "Crypto" },
+    { symbol: "NIFTY", name: "Nifty 50", type: "Indices" },
+    { symbol: "BANKNIFTY", name: "Nifty Bank", type: "Indices" },
+    { symbol: "FINNIFTY", name: "Nifty Financial Services", type: "Indices" },
+    { symbol: "SENSEX", name: "BSE Sensex", type: "Indices" },
+    { symbol: "INDIAVIX", name: "India VIX", type: "Indices" },
+    { symbol: "SPX", name: "S&P 500", type: "Indices" },
+    { symbol: "NDX", name: "NASDAQ 100", type: "Indices" },
+    { symbol: "DJI", name: "Dow Jones Industrial", type: "Indices" }
+];
+
+const apiKey = 'YIA0HZOTJCUEICY3';
+let searchTimeout = null;
+
+if (symbolInput && searchDropdown) {
+    symbolInput.addEventListener('input', function() {
+        const query = this.value.trim().toUpperCase();
+        searchDropdown.innerHTML = "";
+        
+        if (query.length < 1) {
+            searchDropdown.style.display = "none";
+            return;
+        }
+
+        searchDropdown.style.display = "block";
+        let hasResults = false;
+
+        const localResults = localAssets.filter(item => 
+            item.symbol.includes(query) || item.name.toUpperCase().includes(query)
+        ).slice(0, 6);
+
+        if (localResults.length > 0) {
+            hasResults = true;
+            localResults.forEach(item => {
+                const div = document.createElement('div');
+                div.className = "search-item";
+                div.innerHTML = `
+                    <div>
+                        <span class="symbol-name">${item.symbol}</span>
+                        <br><small style="color:gray">${item.name}</small>
+                    </div>
+                    <span class="market-type">${item.type}</span>
+                `;
+                div.addEventListener('click', () => {
+                    symbolInput.value = item.symbol;
+                    marketSelect.value = item.type;
+                    searchDropdown.style.display = "none";
+                });
+                searchDropdown.appendChild(div);
+            });
+        }
+
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = "search-item";
+        loadingDiv.style.color = "gray";
+        loadingDiv.style.fontSize = "0.8rem";
+        loadingDiv.innerHTML = `<em>Searching live stocks...</em>`;
+        searchDropdown.appendChild(loadingDiv);
+
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(async () => {
+            try {
+                const response = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${query}&apikey=${apiKey}`);
+                const data = await response.json();
+
+                if(searchDropdown.contains(loadingDiv)) {
+                    searchDropdown.removeChild(loadingDiv);
+                }
+
+                if (data.bestMatches && data.bestMatches.length > 0) {
+                    const stockResults = data.bestMatches.slice(0, 6);
+                    
+                    if (stockResults.length > 0) hasResults = true;
+
+                    stockResults.forEach(item => {
+                        const symbol = item['1. symbol'];
+                        const name = item['2. name'] || "Unknown Stock";
+                        const type = item['3. type'];
+                        
+                        let marketType = "Stock";
+                        if (type === "ETF") marketType = "Indices";
+
+                        let exchangeBadge = "";
+                        if (symbol.endsWith(".BSE")) exchangeBadge = `<span style="font-size: 0.7rem; background: #fef3c7; color: #f59e0b; padding: 2px 4px; border-radius: 4px; margin-left: 5px;">BSE</span>`;
+
+                        const div = document.createElement('div');
+                        div.className = "search-item";
+                        div.innerHTML = `
+                            <div>
+                                <span class="symbol-name">${symbol}</span> ${exchangeBadge}
+                                <br><small style="color:gray">${name}</small>
+                            </div>
+                            <span class="market-type">${marketType}</span>
+                        `;
+                        
+                        div.addEventListener('click', () => {
+                            symbolInput.value = symbol.replace('.BSE', '');
+                            marketSelect.value = marketType;
+                            searchDropdown.style.display = "none";
+                        });
+                        searchDropdown.appendChild(div);
+                    });
+                }
+
+                if (!hasResults) {
+                    searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found.</div>';
+                }
+            } catch (error) {
+                if(searchDropdown.contains(loadingDiv)) searchDropdown.removeChild(loadingDiv);
+                if (!hasResults) {
+                    searchDropdown.innerHTML = '<div class="search-item" style="color:gray;">No results found in local database.</div>';
+                }
+            }
+        }, 800); 
+    });
+
+    document.addEventListener('click', (e) => {
+        if (!symbolInput.contains(e.target) && !searchDropdown.contains(e.target)) {
+            searchDropdown.style.display = "none";
+        }
+    });
 }
