@@ -209,4 +209,4 @@ select option { background: var(--bg-surface); color: var(--text-dark); }
 .market-filter-btn:hover { color: var(--text-dark); border-color: var(--text-muted); }
 .market-filter-btn.active {
     background: var(--primary-light); color: #d8b4fe; border-color: var(--primary);
-}
+} 

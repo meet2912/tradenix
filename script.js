@@ -642,4 +642,4 @@ if (symbolInput && searchDropdown) {
             searchDropdown.style.display = "none";
         }
     });
-}
+} 
